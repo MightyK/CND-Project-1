@@ -3,6 +3,8 @@ from flask import Flask, redirect, request, send_file
 from google.cloud import storage
 
 os.makedirs('files', exist_ok = True)
+storage_client = storage.Client()
+BUCKET_NAME = "cnd_proj1_bucket"
 
 app = Flask(__name__)
 
@@ -26,8 +28,12 @@ def index():
 
 @app.route('/upload', methods=["POST"])
 def upload():
+    # Send File to bucket
     file = request.files['form_file']  # item name must match name in HTML form
     file.save(os.path.join("./files", file.filename))
+    bucket = storage_client.bucket(BUCKET_NAME)
+    blob = bucket.blob(os.path.join("./files", file.filename))
+    blob.upload_from_filename(os.path.join("./files", file.filename))
 
     return redirect("/")
 
