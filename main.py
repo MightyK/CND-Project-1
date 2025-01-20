@@ -1,14 +1,17 @@
 import os
 from flask import Flask, redirect, request, send_file
+from google.cloud import storage
 
 os.makedirs('files', exist_ok = True)
+storage_client = storage.Client()
+BUCKET_NAME = "cnd_proj1_bucket1"
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
     index_html="""
-<form method="post" enctype="multipart/form-data" action="/upload" method="post">
+<form enctype="multipart/form-data" action="/upload" method="post">
   <div>
     <label for="file">Choose file to upload</label>
     <input type="file" id="file" name="form_file" accept="image/jpeg"/>
@@ -16,33 +19,56 @@ def index():
   <div>
     <button>Submit</button>
   </div>
-</form>"""    
+</form>
+<ul>"""    
 
     for file in list_files():
-        index_html += "<li><a href=\"/files/" + file + "\">" + file + "</a></li>"
+        img_path = f"https://storage.cloud.google.com/{BUCKET_NAME}/{file}"
+        index_html += f"<li><a href={img_path}>{file}</a></li>"
 
+    index_html += "</ul>"
     return index_html
 
 @app.route('/upload', methods=["POST"])
 def upload():
-    file = request.files['form_file']  # item name must match name in HTML form
-    file.save(os.path.join("./files", file.filename))
+    # Send File to bucket
+    file = request.files.get('form_file')  # item name must match name in HTML form
+    if not file or not file.filename:
+      return "No file selected", 400
+
+    local_path = os.path.join("./files", file.filename)
+
+    file.save(local_path)
+
+    bucket = storage_client.bucket(BUCKET_NAME)
+    blob = bucket.blob(file.filename)
+    blob.upload_from_filename(local_path)
+
+    # os.remove(local_path)
 
     return redirect("/")
 
 @app.route('/files')
 def list_files():
-    files = os.listdir("./files")
+    bucket = storage_client.bucket(BUCKET_NAME)
+    blobs = bucket.list_blobs()
+
     jpegs = []
-    for file in files:
-        if file.lower().endswith(".jpeg") or file.lower().endswith(".jpg"):
-            jpegs.append(file)
+    for blob in blobs:
+        if blob.name.lower().endswith(".jpeg") or blob.name.lower().endswith(".jpg"):
+            jpegs.append(blob.name)
     
     return jpegs
 
 @app.route('/files/<filename>')
 def get_file(filename):
-  return send_file('./files/'+filename)
+  path = os.path.join(BUCKET_NAME + '/', filename)
+  bucket = storage_client.bucket(BUCKET_NAME)
+
+  blob = bucket.blob(filename)
+  blob.download_to_filename(path)
+
+  return send_file(path)
 
 if __name__ == '__main__':
     app.run(host="localhost", port=8080, debug=True)
