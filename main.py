@@ -1,11 +1,10 @@
 import os
 from flask import Flask, redirect, request, send_file
 from google.cloud import storage
-from google.cloud import storage
 
 os.makedirs('files', exist_ok = True)
 storage_client = storage.Client()
-BUCKET_NAME = "cnd_proj1_bucket1"
+BUCKET_NAME = "cnd-proj1-bucket1"
 
 app = Flask(__name__)
 
